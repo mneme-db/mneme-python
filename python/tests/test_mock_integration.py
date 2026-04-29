@@ -1,0 +1,87 @@
+from __future__ import annotations
+
+import ctypes
+from pathlib import Path
+from typing import Any
+
+from mneme.collection import Collection
+from mneme.results import SearchResult
+
+
+class _FakeLib:
+    def __init__(self) -> None:
+        self.saved_path: bytes | None = None
+        self.search_calls = 0
+        self.insert_calls = 0
+
+    def mneme_collection_insert(self, *args: Any) -> int:
+        self.insert_calls += 1
+        return 0
+
+    def mneme_collection_delete(self, *args: Any) -> int:
+        return 0
+
+    def mneme_collection_count(self, *args: Any) -> int:
+        return 7
+
+    def mneme_collection_search_flat(self, *args: Any) -> int:
+        self.search_calls += 1
+        return 0
+
+    def mneme_collection_search_hnsw(self, *args: Any) -> int:
+        self.search_calls += 1
+        return 0
+
+    def mneme_collection_build_hnsw(self, *args: Any) -> int:
+        return 0
+
+    def mneme_collection_save(self, _handle: Any, path: bytes) -> int:
+        self.saved_path = path
+        return 0
+
+    def mneme_collection_free(self, *args: Any) -> None:
+        return None
+
+    def mneme_results_len(self, *args: Any) -> int:
+        return 2
+
+    def mneme_results_id(self, _results: Any, index: int) -> bytes:
+        return b"a" if index == 0 else b"b"
+
+    def mneme_results_score(self, _results: Any, index: int) -> float:
+        return 0.99 if index == 0 else 0.42
+
+    def mneme_results_free(self, *args: Any) -> None:
+        return None
+
+
+def _mock_collection() -> Collection:
+    col = Collection.__new__(Collection)
+    col._handle = ctypes.c_void_p(1)
+    col.name = "mock"
+    col.dimension = 3
+    col.metric = 1
+    return col
+
+
+def test_collection_methods_with_mocked_native(monkeypatch):
+    fake_lib = _FakeLib()
+    monkeypatch.setattr("mneme.collection.native.LIB", fake_lib)
+    monkeypatch.setattr("mneme.collection.native.raise_for_status", lambda _status: None)
+
+    collection = _mock_collection()
+    collection.insert("a", [1.0, 0.0, 0.0], metadata="alpha")
+    collection.delete("a")
+    assert collection.count() == 7
+
+    flat_results = collection.search([1.0, 0.0, 0.0], k=2)
+    ann_results = collection.search_hnsw([1.0, 0.0, 0.0], k=2, ef_search=64)
+    collection.build_hnsw()
+    collection.save(Path("tmp.mneme"))
+    collection.close()
+
+    assert fake_lib.insert_calls == 1
+    assert fake_lib.search_calls == 2
+    assert fake_lib.saved_path == b"tmp.mneme"
+    assert flat_results == [SearchResult(id="a", score=0.99), SearchResult(id="b", score=0.42)]
+    assert ann_results == [SearchResult(id="a", score=0.99), SearchResult(id="b", score=0.42)]

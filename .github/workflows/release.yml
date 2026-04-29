@@ -1,0 +1,56 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/mneme
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify tag matches python package version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          python - <<'PY'
+          import os
+          import tomllib
+          from pathlib import Path
+
+          tag = os.environ["RELEASE_TAG"]
+          expected = tag[1:] if tag.startswith("v") else tag
+          pyproject = Path("python/pyproject.toml")
+          data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+          actual = str(data["project"]["version"])
+          if actual != expected:
+              raise SystemExit(
+                  f"Release tag '{tag}' does not match python/pyproject.toml version '{actual}'"
+              )
+          print(f"Version check passed: tag={tag} version={actual}")
+          PY
+
+      - name: Build distribution
+        working-directory: python
+        run: |
+          python -m pip install build
+          python -m build
+
+      - name: Publish package to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: python/dist
