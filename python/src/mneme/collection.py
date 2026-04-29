@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from contextlib import suppress
 from pathlib import Path
 from types import TracebackType
+from typing import TYPE_CHECKING
 
 from . import native
 from .results import SearchResult
@@ -14,15 +15,21 @@ try:
 except Exception:  # pragma: no cover - optional dependency
     _np = None
 
+if TYPE_CHECKING:
+    from .native import Metric
+
 
 def _as_float_vector(values: Sequence[float]) -> tuple[ctypes.Array[ctypes.c_float], int]:
     if _np is not None and isinstance(values, _np.ndarray):
         arr = _np.asarray(values, dtype=_np.float32)
         if arr.ndim != 1:
             raise ValueError("vector must be a 1D array")
-        data = arr.tolist()
-    else:
-        data = [float(v) for v in values]
+        contiguous = _np.ascontiguousarray(arr, dtype=_np.float32)
+        vector_len = int(contiguous.size)
+        vector = (ctypes.c_float * vector_len).from_buffer_copy(contiguous.tobytes())
+        return vector, vector_len
+
+    data = [float(v) for v in values]
     vector_len = len(data)
     return (ctypes.c_float * vector_len)(*data), vector_len
 
@@ -44,7 +51,9 @@ class Collection:
     dimension: int | None
     metric: int | None
 
-    def __init__(self, name: str, dimension: int, metric: int = native.MNEME_METRIC_COSINE) -> None:
+    def __init__(
+        self, name: str, dimension: int, metric: int | Metric = native.MNEME_METRIC_COSINE
+    ) -> None:
         if not name:
             raise ValueError("name must be non-empty")
         if dimension <= 0:
@@ -57,9 +66,14 @@ class Collection:
             ctypes.byref(self._handle),
         )
         native.raise_for_status(int(status))
-        self.name = name
-        self.dimension = int(dimension)
-        self.metric = int(metric)
+        try:
+            self.name = name
+            self.dimension = int(dimension)
+            self.metric = int(metric)
+        except Exception:
+            native.LIB.mneme_collection_free(self._handle)
+            self._handle = native.CollectionHandle()
+            raise
 
     @classmethod
     def load(cls, path: str | Path) -> Collection:

@@ -26,10 +26,10 @@ pip install -e ./python
 ### End-to-end: create, mutate, search, persist, reload
 
 ```python
-from mneme import Collection
+from mneme import Collection, Metric
 
 # Create a fixed-dimension cosine collection.
-db = Collection("docs", dimension=3)
+db = Collection("docs", dimension=3, metric=Metric.COSINE)
 
 # Insert rows (metadata is optional string).
 db.insert("a", [1.0, 0.0, 0.0], metadata="alpha")
@@ -140,6 +140,11 @@ Note on loaded metadata:
 
 - `Collection.load()` currently sets `dimension` and `metric` to `None` because the
   current C ABI does not expose readback accessors for those values.
+
+Native loader note:
+
+- Use `MNEME_REPO_PATH` to point at a local mneme repo when your directory layout
+  is not the default sibling `../mneme`.
 
 ## Known limitations
 

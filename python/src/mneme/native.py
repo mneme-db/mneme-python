@@ -5,6 +5,7 @@ import json
 import os
 import platform
 import tarfile
+from enum import IntEnum
 from pathlib import Path
 from typing import Any, cast
 from urllib.error import URLError
@@ -26,6 +27,10 @@ MNEME_METRIC_COSINE = 1
 MNEME_EF_SEARCH_DEFAULT = 0
 
 
+class Metric(IntEnum):
+    COSINE = MNEME_METRIC_COSINE
+
+
 class MnemeHnswConfig(ctypes.Structure):
     _fields_ = [
         ("m", ctypes.c_uint32),
@@ -43,6 +48,18 @@ _ALLOWED_DOWNLOAD_HOSTS = {
 }
 
 _LIB_INSTANCE: ctypes.CDLL | None = None
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    value = raw.strip().lower()
+    if value in {"1", "true", "yes", "on"}:
+        return True
+    if value in {"0", "false", "no", "off"}:
+        return False
+    return default
 
 
 def _validated_url(url: str) -> str:
@@ -82,6 +99,12 @@ def _candidate_library_paths() -> list[Path]:
     explicit = os.environ.get("MNEME_LIBRARY_PATH")
     if explicit:
         paths.append(Path(explicit))
+
+    explicit_repo = os.environ.get("MNEME_REPO_PATH")
+    if explicit_repo:
+        repo = Path(explicit_repo).expanduser()
+        for name in _library_filenames():
+            paths.extend([repo / "zig-out" / "lib" / name, repo / name])
 
     package_file = Path(__file__).resolve()
     repo_root = package_file.parents[3]
@@ -150,7 +173,7 @@ def _resolve_release_asset(tag: str, platform_id: str) -> tuple[str, str]:
 
 
 def _download_release_library() -> Path | None:
-    if os.environ.get("MNEME_AUTO_DOWNLOAD", "1").strip().lower() in ("0", "false", "no"):
+    if not _env_bool("MNEME_AUTO_DOWNLOAD", True):
         return None
 
     names = _library_filenames()
@@ -192,7 +215,7 @@ def _download_release_library() -> Path | None:
 
 def _load_library() -> ctypes.CDLL:
     errors: list[str] = []
-    debug = os.environ.get("MNEME_DEBUG_LOAD", "0").strip().lower() in ("1", "true", "yes")
+    debug = _env_bool("MNEME_DEBUG_LOAD", False)
     attempts: list[str] = []
 
     def _debug(msg: str) -> None:

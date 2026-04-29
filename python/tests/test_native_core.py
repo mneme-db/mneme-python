@@ -93,6 +93,22 @@ def test_cache_dir_env_override(monkeypatch, tmp_path, native_module):
     assert native_module._cache_dir() == tmp_path
 
 
+def test_env_bool_parsing(monkeypatch, native_module):
+    monkeypatch.setenv("MNEME_FLAG", "true")
+    assert native_module._env_bool("MNEME_FLAG", False) is True
+    monkeypatch.setenv("MNEME_FLAG", "off")
+    assert native_module._env_bool("MNEME_FLAG", True) is False
+    monkeypatch.setenv("MNEME_FLAG", "weird")
+    assert native_module._env_bool("MNEME_FLAG", True) is True
+
+
+def test_candidate_library_paths_include_repo_env(monkeypatch, native_module):
+    monkeypatch.setenv("MNEME_REPO_PATH", "/tmp/mneme-custom")
+    monkeypatch.setattr(native_module, "_library_filenames", lambda: ["libmneme.dylib"])
+    paths = native_module._candidate_library_paths()
+    assert Path("/tmp/mneme-custom/zig-out/lib/libmneme.dylib") in paths
+
+
 def test_download_release_library_disabled(monkeypatch, native_module):
     monkeypatch.setenv("MNEME_AUTO_DOWNLOAD", "0")
     assert native_module._download_release_library() is None

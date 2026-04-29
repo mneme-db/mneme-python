@@ -34,10 +34,11 @@ for row in results:
 Lookup order:
 
 1. `MNEME_LIBRARY_PATH`
-2. `../mneme/zig-out/lib` (sibling dependency default)
-3. current working directory fallbacks
-4. system dynamic loader paths
-5. GitHub release auto-download (cached)
+2. `MNEME_REPO_PATH` (`<repo>/zig-out/lib` then `<repo>`)
+3. `../mneme/zig-out/lib` (sibling dependency default)
+4. current working directory fallbacks
+5. system dynamic loader paths
+6. GitHub release auto-download (cached)
 
 Release auto-download defaults:
 
@@ -46,6 +47,11 @@ Release auto-download defaults:
 - cache dir: `~/.cache/mneme-python` (override with `MNEME_CACHE_DIR`)
 - disable with `MNEME_AUTO_DOWNLOAD=0`
 - debug loader selection with `MNEME_DEBUG_LOAD=1`
+
+API notes:
+
+- `Collection` accepts `metric` as either `int` or `mneme.Metric` (for now: `Metric.COSINE`).
+- `Collection.delete(id)` raises `ValueError` if the id does not exist.
 
 ## Testing
 
