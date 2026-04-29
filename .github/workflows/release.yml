@@ -2,6 +2,7 @@ name: Release
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  MNEME_NATIVE_RELEASE_TAG: latest
 on:
   release:
     types: [published]
@@ -60,7 +61,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           python scripts/prepare_bundled_native.py \
-            --tag "${{ github.event.release.tag_name }}" \
+            --tag "${{ env.MNEME_NATIVE_RELEASE_TAG }}" \
             --platform-id "${{ matrix.platform_id }}" \
             --token "${GITHUB_TOKEN}"
 

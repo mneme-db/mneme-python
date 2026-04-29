@@ -5,6 +5,7 @@ import argparse
 import json
 import tarfile
 from pathlib import Path
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 
@@ -17,16 +18,25 @@ def _lib_name(platform_id: str) -> str:
 
 
 def _release_payload(tag: str, token: str | None) -> dict:
+    latest_url = "https://api.github.com/repos/mneme-db/mneme/releases/latest"
     if tag == "latest":
-        url = "https://api.github.com/repos/mneme-db/mneme/releases/latest"
+        url = latest_url
     else:
         url = f"https://api.github.com/repos/mneme-db/mneme/releases/tags/{tag}"
     headers = {"Accept": "application/vnd.github+json", "User-Agent": "mneme-python-build"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
-    req = Request(url, headers=headers)
-    with urlopen(req, timeout=30) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+    try:
+        req = Request(url, headers=headers)
+        with urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except HTTPError as exc:
+        if exc.code == 404 and tag != "latest":
+            print(f"mneme release tag '{tag}' not found; falling back to latest")
+            req = Request(latest_url, headers=headers)
+            with urlopen(req, timeout=30) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        raise
 
 
 def _download_asset(url: str, out_file: Path, token: str | None) -> None:
