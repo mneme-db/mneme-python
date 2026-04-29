@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from mneme import native
 
-
-def test_resolve_release_asset_from_mocked_payload(monkeypatch):
+def test_resolve_release_asset_from_mocked_payload(monkeypatch, native_module):
     payload = {
         "tag_name": "v0.5.0",
         "assets": [
@@ -17,8 +15,8 @@ def test_resolve_release_asset_from_mocked_payload(monkeypatch):
             },
         ],
     }
-    monkeypatch.setattr(native, "_fetch_json", lambda _url: payload)
+    monkeypatch.setattr(native_module, "_fetch_json", lambda _url: payload)
 
-    url, tag = native._resolve_release_asset("latest", "macos-arm64")
+    url, tag = native_module._resolve_release_asset("latest", "macos-arm64")
     assert tag == "v0.5.0"
     assert url == "https://example/macos"

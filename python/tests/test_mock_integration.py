@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import ctypes
+import importlib
 from pathlib import Path
 from typing import Any
-
-from mneme.collection import Collection
-from mneme.results import SearchResult
 
 
 class _FakeLib:
@@ -55,8 +53,8 @@ class _FakeLib:
         return None
 
 
-def _mock_collection() -> Collection:
-    col = Collection.__new__(Collection)
+def _mock_collection(collection_cls):
+    col = collection_cls.__new__(collection_cls)
     col._handle = ctypes.c_void_p(1)
     col.name = "mock"
     col.dimension = 3
@@ -65,11 +63,15 @@ def _mock_collection() -> Collection:
 
 
 def test_collection_methods_with_mocked_native(monkeypatch):
+    collection_module = importlib.import_module("mneme.collection")
+    collection_cls = collection_module.Collection
+    search_result_cls = importlib.import_module("mneme.results").SearchResult
+
     fake_lib = _FakeLib()
     monkeypatch.setattr("mneme.collection.native.LIB", fake_lib)
     monkeypatch.setattr("mneme.collection.native.raise_for_status", lambda _status: None)
 
-    collection = _mock_collection()
+    collection = _mock_collection(collection_cls)
     collection.insert("a", [1.0, 0.0, 0.0], metadata="alpha")
     collection.delete("a")
     assert collection.count() == 7
@@ -83,5 +85,11 @@ def test_collection_methods_with_mocked_native(monkeypatch):
     assert fake_lib.insert_calls == 1
     assert fake_lib.search_calls == 2
     assert fake_lib.saved_path == b"tmp.mneme"
-    assert flat_results == [SearchResult(id="a", score=0.99), SearchResult(id="b", score=0.42)]
-    assert ann_results == [SearchResult(id="a", score=0.99), SearchResult(id="b", score=0.42)]
+    assert flat_results == [
+        search_result_cls(id="a", score=0.99),
+        search_result_cls(id="b", score=0.42),
+    ]
+    assert ann_results == [
+        search_result_cls(id="a", score=0.99),
+        search_result_cls(id="b", score=0.42),
+    ]
