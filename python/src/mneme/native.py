@@ -102,6 +102,10 @@ def _candidate_library_paths() -> list[Path]:
     if explicit:
         paths.append(Path(explicit))
 
+    package_dir = Path(__file__).resolve().parent
+    for name in _library_filenames():
+        paths.append(package_dir / "_native" / name)
+
     explicit_repo = os.environ.get("MNEME_REPO_PATH")
     if explicit_repo:
         repo = Path(explicit_repo).expanduser()

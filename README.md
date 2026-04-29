@@ -176,12 +176,13 @@ Error mapping:
 
 Lookup order:
 
-1. `MNEME_LIBRARY_PATH`
-2. `MNEME_REPO_PATH` (`<repo>/zig-out/lib` then `<repo>`)
-3. `../mneme/zig-out/lib` (sibling dependency default)
-4. current working directory fallbacks
-5. system dynamic loader paths
-6. GitHub release auto-download (cached)
+1. bundled native lib inside wheel (`mneme/_native/*`) when present
+2. `MNEME_LIBRARY_PATH`
+3. `MNEME_REPO_PATH` (`<repo>/zig-out/lib` then `<repo>`)
+4. `../mneme/zig-out/lib` (sibling dependency default)
+5. current working directory fallbacks
+6. system dynamic loader paths
+7. GitHub release auto-download (cached)
 
 Release auto-download defaults:
 
@@ -236,7 +237,7 @@ CI runs the same checks in `.github/workflows/ci.yml`.
 
 ## Known limitations
 
-- No wheels published yet.
+- Platform-specific binary wheels are built in release CI for Linux x86_64 and macOS arm64.
 - Native library may be auto-fetched from releases; offline usage still requires local library availability.
 - Windows support is not included in this phase.
 - Metadata remains string-only.
