@@ -48,8 +48,9 @@ def _decode_results(handle: native.ResultsHandle) -> list[SearchResult]:
 
 
 class Collection:
-    dimension: int | None
-    metric: int | None
+    _dimension: int | None
+    _metric: int | None
+    _name: str
 
     def __init__(
         self, name: str, dimension: int, metric: int | Metric = native.MNEME_METRIC_COSINE
@@ -67,9 +68,9 @@ class Collection:
         )
         native.raise_for_status(int(status))
         try:
-            self.name = name
-            self.dimension = int(dimension)
-            self.metric = int(metric)
+            self._name = name
+            self._dimension = int(dimension)
+            self._metric = int(metric)
         except Exception:
             native.LIB.mneme_collection_free(self._handle)
             self._handle = native.CollectionHandle()
@@ -82,12 +83,24 @@ class Collection:
         native.raise_for_status(int(status))
         obj = cls.__new__(cls)
         obj._handle = handle
-        obj.name = Path(path).stem
+        obj._name = Path(path).stem
         # ABI currently does not expose dimension/metric accessors after load.
         # Keep these unknown instead of fabricating potentially wrong values.
-        obj.dimension = None
-        obj.metric = None
+        obj._dimension = None
+        obj._metric = None
         return obj
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def dimension(self) -> int | None:
+        return self._dimension
+
+    @property
+    def metric(self) -> int | None:
+        return self._metric
 
     def close(self) -> None:
         if getattr(self, "_handle", None):

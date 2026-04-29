@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ctypes
 import json
+import logging
 import os
 import platform
 import tarfile
@@ -48,6 +49,7 @@ _ALLOWED_DOWNLOAD_HOSTS = {
 }
 
 _LIB_INSTANCE: ctypes.CDLL | None = None
+_LOGGER = logging.getLogger("mneme")
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -217,10 +219,16 @@ def _load_library() -> ctypes.CDLL:
     errors: list[str] = []
     debug = _env_bool("MNEME_DEBUG_LOAD", False)
     attempts: list[str] = []
+    if debug:
+        if not _LOGGER.handlers:
+            handler = logging.StreamHandler()
+            handler.setFormatter(logging.Formatter("[mneme] %(message)s"))
+            _LOGGER.addHandler(handler)
+        _LOGGER.setLevel(logging.DEBUG)
 
     def _debug(msg: str) -> None:
         if debug:
-            print(f"[mneme] {msg}")
+            _LOGGER.debug(msg)
 
     for candidate in _candidate_library_paths():
         attempts.append(f"candidate:{candidate}")

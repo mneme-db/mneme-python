@@ -48,6 +48,20 @@ Release auto-download defaults:
 - disable with `MNEME_AUTO_DOWNLOAD=0`
 - debug loader selection with `MNEME_DEBUG_LOAD=1`
 
+Debug logging example:
+
+```python
+import logging
+import os
+
+os.environ["MNEME_DEBUG_LOAD"] = "1"
+
+logging.basicConfig(level=logging.DEBUG)
+logging.getLogger("mneme").setLevel(logging.DEBUG)
+
+import mneme  # loader debug messages emitted via the "mneme" logger
+```
+
 API notes:
 
 - `Collection` accepts `metric` as either `int` or `mneme.Metric` (for now: `Metric.COSINE`).

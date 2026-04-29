@@ -24,6 +24,10 @@ def test_metric_enum_constructor(mneme_module):
     collection = mneme_module.Collection("docs", dimension=3, metric=mneme_module.Metric.COSINE)
     try:
         assert collection.metric == int(mneme_module.Metric.COSINE)
+        with pytest.raises(AttributeError):
+            collection.metric = 2
+        with pytest.raises(AttributeError):
+            collection.dimension = 8
     finally:
         collection.close()
 

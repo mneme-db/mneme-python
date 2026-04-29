@@ -56,9 +56,9 @@ class _FakeLib:
 def _mock_collection(collection_cls):
     col = collection_cls.__new__(collection_cls)
     col._handle = ctypes.c_void_p(1)
-    col.name = "mock"
-    col.dimension = 3
-    col.metric = 1
+    col._name = "mock"
+    col._dimension = 3
+    col._metric = 1
     return col
 
 
