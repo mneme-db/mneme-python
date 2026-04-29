@@ -53,8 +53,9 @@ def test_safe_extract_tar_rejects_escape(tmp_path):
         info.size = len(payload)
         tf.addfile(info, io.BytesIO(payload))
 
-    with tarfile.open(tar_path, "r:gz") as tf, pytest.raises(
-        OSError, match="Unsafe tar member path detected"
+    with (
+        tarfile.open(tar_path, "r:gz") as tf,
+        pytest.raises(OSError, match="Unsafe tar member path detected"),
     ):
         native._safe_extract_tar(tf, tmp_path / "out")
 
@@ -180,4 +181,3 @@ def test_ensure_count_zero_non_error_returns_zero(monkeypatch):
     monkeypatch.setattr(native, "LIB", _Lib())
     monkeypatch.setattr(native, "last_error_text", lambda: "")
     assert native.ensure_count(None) == 0
-
