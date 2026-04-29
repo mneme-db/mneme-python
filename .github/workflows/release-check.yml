@@ -23,6 +23,9 @@ jobs:
           cache: pip
           cache-dependency-path: python/pyproject.toml
 
+      - name: Verify python README is in sync
+        run: python scripts/sync_python_readme.py --check
+
       - name: Verify tag matches python package version
         env:
           RELEASE_TAG: ${{ github.ref_name }}

@@ -1,16 +1,21 @@
-# mneme Python wrapper
+# mneme-python
 
-First Python wrapper for the `mneme` embedded vector database core.
+[![CI](https://github.com/mneme-db/mneme-python/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/mneme-db/mneme-python/actions/workflows/ci.yml)
+[![Release Check](https://github.com/mneme-db/mneme-python/actions/workflows/release-check.yml/badge.svg)](https://github.com/mneme-db/mneme-python/actions/workflows/release-check.yml)
+[![Release](https://github.com/mneme-db/mneme-python/actions/workflows/release.yml/badge.svg)](https://github.com/mneme-db/mneme-python/actions/workflows/release.yml)
+[![TestPyPI](https://github.com/mneme-db/mneme-python/actions/workflows/testpypi.yml/badge.svg)](https://github.com/mneme-db/mneme-python/actions/workflows/testpypi.yml)
 
-## Install (source, local dev)
+Python wrapper package for [`mneme`](https://github.com/mneme-db/mneme), the embedded-first vector/memory database core written in Zig.
 
-1. Install package in editable mode from this repo:
+## Status
+
+Phase 6 initial wrapper is implemented with a `ctypes` binding over the stable C ABI.
+
+## Install from source
 
 ```bash
 pip install -e ./python
 ```
-
-2. Import and use `mneme`; the wrapper will auto-download a matching native release asset if local libs are not found.
 
 ## Usage
 
@@ -227,3 +232,31 @@ CI runs the same checks in `.github/workflows/ci.yml`.
 
 - If import fails with native load error, set `MNEME_RELEASE_TAG` to a known release like `v0.5.0` and retry.
 - Set `MNEME_LIBRARY_PATH` explicitly to a compiled shared library if you use a custom build location.
+```
+
+## Known limitations
+
+- No wheels published yet.
+- Native library may be auto-fetched from releases; offline usage still requires local library availability.
+- Windows support is not included in this phase.
+- Metadata remains string-only.
+- HNSW index is not persisted.
+- PyOZ remains experimental and not the production binding path in Phase 6.
+
+## CI/CD
+
+GitHub Actions is configured with:
+
+- `CI` workflow on pushes/PRs:
+  - matrix testing on macOS/Linux and Python `3.10`, `3.12`, `3.14`
+  - `ruff`, `bandit`, `mypy`, and `pytest` with coverage gate
+  - package build validation (`python -m build` + `twine check`)
+- `Release` workflow on published GitHub releases:
+  - builds package and publishes to PyPI via trusted publishing (OIDC)
+- `Release Check` workflow on `v*` tag pushes:
+  - verifies tag/version parity before release steps
+  - builds package + runs `twine check` for artifact integrity
+- `Publish TestPyPI` workflow:
+  - publishes prerelease or manually dispatched builds to TestPyPI
+  - validates release tag/version parity before publish
+- Dependabot for GitHub Actions and Python dependency updates.

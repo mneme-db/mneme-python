@@ -31,6 +31,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Verify python README is in sync
+        run: python scripts/sync_python_readme.py --check
+
       - name: Resolve expected tag
         id: tag
         run: |
