@@ -26,6 +26,102 @@ for row in results:
     print(row.id, row.score)
 ```
 
+## Detailed end-to-end example (different use case)
+
+### Customer support incident triage with semantic retrieval
+
+This example shows how to:
+
+1. create embeddings with a real model,
+2. store incidents in `mneme`,
+3. query by natural language symptoms,
+4. evaluate retrieval quality with `hit@k` and `MRR@k`.
+
+```python
+from __future__ import annotations
+
+import numpy as np
+import pandas as pd
+from sentence_transformers import SentenceTransformer
+
+from mneme import Collection, Metric
+
+# 1) Incident knowledge base
+incidents = [
+    "Mobile app crashes on launch after updating to iOS 18.",
+    "Users cannot reset password because email links expire immediately.",
+    "Checkout fails with timeout errors when cart has more than 20 items.",
+    "Search results are empty when query contains special characters like '+'.",
+    "Webhook retries spike due to TLS handshake failures in eu-west.",
+    "CSV export generates corrupted files for accounts with unicode names.",
+    "Login latency increased after enabling strict bot detection rules.",
+    "Dashboard charts fail to render for users with read-only role.",
+]
+
+incident_df = pd.DataFrame(
+    {
+        "id": [f"inc_{i}" for i in range(len(incidents))],
+        "text": incidents,
+        "severity": ["high", "medium", "high", "medium", "high", "medium", "medium", "low"],
+    }
+)
+
+# 2) Build embeddings
+model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+vectors = model.encode(incident_df["text"].tolist(), normalize_embeddings=True)
+vectors = np.asarray(vectors, dtype=np.float32)
+
+# 3) Index in mneme
+db = Collection("support_incidents", dimension=vectors.shape[1], metric=Metric.COSINE)
+for i, row in incident_df.iterrows():
+    # Metadata is optional string; include severity+text payload.
+    db.insert(row["id"], vectors[i], metadata=f"severity={row['severity']} | {row['text']}")
+
+print("rows indexed:", db.count())
+
+# 4) Query helper
+id_to_text = dict(zip(incident_df["id"], incident_df["text"]))
+
+def retrieve(query: str, k: int = 3) -> pd.DataFrame:
+    q_vec = model.encode([query], normalize_embeddings=True)
+    q_vec = np.asarray(q_vec, dtype=np.float32)[0]
+    results = db.search(q_vec, k=k)
+    return pd.DataFrame(
+        [{"id": r.id, "score": float(r.score), "text": id_to_text.get(r.id, "")} for r in results]
+    )
+
+print(retrieve("password reset email link is invalid", k=3))
+print(retrieve("ios app immediately crashes after update", k=3))
+
+# 5) Lightweight retrieval evaluation
+eval_cases = [
+    {"query": "password reset links are broken", "gold": {"inc_1"}},
+    {"query": "app crash after iOS upgrade", "gold": {"inc_0"}},
+    {"query": "timeouts during checkout on large carts", "gold": {"inc_2"}},
+]
+
+def evaluate(k: int = 3) -> pd.DataFrame:
+    rows = []
+    for case in eval_cases:
+        retrieved = retrieve(case["query"], k=k)["id"].tolist()
+        gold = case["gold"]
+        hit = any(doc_id in gold for doc_id in retrieved)
+        rr = 0.0
+        for rank, doc_id in enumerate(retrieved, start=1):
+            if doc_id in gold:
+                rr = 1.0 / rank
+                break
+        rows.append({"query": case["query"], "hit@k": float(hit), "rr": rr, "top_ids": retrieved})
+    out = pd.DataFrame(rows)
+    print(f"Average hit@{k}: {out['hit@k'].mean():.3f}")
+    print(f"MRR@{k}: {out['rr'].mean():.3f}")
+    return out
+
+print(evaluate(k=3))
+
+db.close()
+```
+
 ## Behavior reference
 
 - `Collection.load(path)` sets `collection.dimension` and `collection.metric` to `None` because
