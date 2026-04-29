@@ -9,6 +9,9 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   quality:
     name: Quality (${{ matrix.os }}, py${{ matrix.python-version }})
@@ -24,6 +27,7 @@ jobs:
       PIP_DISABLE_PIP_VERSION_CHECK: "1"
       MNEME_RELEASE_TAG: v0.5.0
       MNEME_AUTO_DOWNLOAD: "1"
+      GITHUB_TOKEN: ${{ github.token }}
 
     steps:
       - name: Checkout
@@ -36,8 +40,21 @@ jobs:
           cache: pip
           cache-dependency-path: python/pyproject.toml
 
+      - name: Cache mneme native release artifacts
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mneme-python
+          key: mneme-native-${{ runner.os }}-py${{ matrix.python-version }}-${{ env.MNEME_RELEASE_TAG }}
+
       - name: Install package and dev dependencies
         run: python -m pip install -e './python[dev]'
+
+      - name: Warm native library cache
+        run: |
+          python - <<'PY'
+          import mneme.native as n
+          print(n._download_release_library())
+          PY
 
       - name: Ruff lint
         run: python -m ruff check python/src python/tests

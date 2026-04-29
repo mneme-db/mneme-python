@@ -150,9 +150,13 @@ def _cache_dir() -> Path:
 
 def _fetch_json(url: str) -> dict[str, Any]:
     checked_url = _validated_url(url)
+    headers = {"Accept": "application/vnd.github+json", "User-Agent": "mneme-python"}
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
     request = Request(
         checked_url,
-        headers={"Accept": "application/vnd.github+json", "User-Agent": "mneme-python"},
+        headers=headers,
     )
     with urlopen(request, timeout=15) as response:  # nosec B310
         data = response.read()
@@ -198,7 +202,11 @@ def _download_release_library() -> Path | None:
     archive_path = out_dir / "release.tar.gz"
     if not archive_path.exists():
         checked_url = _validated_url(download_url)
-        request = Request(checked_url, headers={"User-Agent": "mneme-python"})
+        headers = {"User-Agent": "mneme-python"}
+        token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        request = Request(checked_url, headers=headers)
         with urlopen(request, timeout=30) as response:  # nosec B310
             archive_path.write_bytes(response.read())
 
