@@ -20,7 +20,7 @@ dev = [
   "bandit[toml]>=1.7.9",
   "mypy>=1.11.0",
 ]
-numpy = ["numpy>=1.24"]
+numpy = ["numpy>=2.0.2"]
 
 [tool.setuptools]
 package-dir = { "" = "src" }
