@@ -136,6 +136,11 @@ Search results are `SearchResult` objects with:
 - `result.id`
 - `result.score`
 
+Note on loaded metadata:
+
+- `Collection.load()` currently sets `dimension` and `metric` to `None` because the
+  current C ABI does not expose readback accessors for those values.
+
 ## Known limitations
 
 - No wheels published yet.

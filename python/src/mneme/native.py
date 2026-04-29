@@ -7,6 +7,7 @@ import platform
 import tarfile
 from pathlib import Path
 from typing import Any, cast
+from urllib.error import URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
@@ -41,6 +42,8 @@ _ALLOWED_DOWNLOAD_HOSTS = {
     "release-assets.githubusercontent.com",
 }
 
+_LIB_INSTANCE: ctypes.CDLL | None = None
+
 
 def _validated_url(url: str) -> str:
     parsed = urlparse(url)
@@ -54,6 +57,10 @@ def _validated_url(url: str) -> str:
 def _safe_extract_tar(tf: tarfile.TarFile, out_dir: Path) -> None:
     output_root = out_dir.resolve()
     for member in tf.getmembers():
+        if member.issym() or member.islnk():
+            raise OSError(f"Refusing to extract link entry from archive: {member.name}")
+        if not (member.isdir() or member.isreg()):
+            raise OSError(f"Refusing to extract unsupported archive entry type: {member.name}")
         member_target = (out_dir / member.name).resolve()
         if output_root not in member_target.parents and member_target != output_root:
             raise OSError(f"Unsafe tar member path detected: {member.name}")
@@ -221,7 +228,7 @@ def _load_library() -> ctypes.CDLL:
             _debug(f"loaded native library from downloaded release: {downloaded}")
             return lib
         errors.append("release-download: no compatible library found in downloaded release asset")
-    except Exception as exc:
+    except (OSError, URLError, tarfile.TarError, ValueError) as exc:
         errors.append(f"release-download: {exc}")
 
     detail = "; ".join(errors) if errors else "no candidate library found"
@@ -237,86 +244,101 @@ def _load_library() -> ctypes.CDLL:
     )
 
 
-LIB = _load_library()
-
 CollectionHandle = ctypes.c_void_p
 ResultsHandle = ctypes.c_void_p
 
-LIB.mneme_last_error.argtypes = []
-LIB.mneme_last_error.restype = ctypes.c_char_p
 
-LIB.mneme_abi_version.argtypes = []
-LIB.mneme_abi_version.restype = ctypes.c_uint32
+def _bind_function_signatures(lib: ctypes.CDLL) -> None:
+    lib.mneme_last_error.argtypes = []
+    lib.mneme_last_error.restype = ctypes.c_char_p
 
-LIB.mneme_collection_create.argtypes = [
-    ctypes.c_char_p,
-    ctypes.c_uint32,
-    ctypes.c_uint32,
-    ctypes.POINTER(CollectionHandle),
-]
-LIB.mneme_collection_create.restype = ctypes.c_uint32
+    lib.mneme_abi_version.argtypes = []
+    lib.mneme_abi_version.restype = ctypes.c_uint32
 
-LIB.mneme_collection_free.argtypes = [CollectionHandle]
-LIB.mneme_collection_free.restype = None
+    lib.mneme_collection_create.argtypes = [
+        ctypes.c_char_p,
+        ctypes.c_uint32,
+        ctypes.c_uint32,
+        ctypes.POINTER(CollectionHandle),
+    ]
+    lib.mneme_collection_create.restype = ctypes.c_uint32
 
-LIB.mneme_collection_insert.argtypes = [
-    CollectionHandle,
-    ctypes.c_char_p,
-    ctypes.POINTER(ctypes.c_float),
-    ctypes.c_uint32,
-    ctypes.c_char_p,
-]
-LIB.mneme_collection_insert.restype = ctypes.c_uint32
+    lib.mneme_collection_free.argtypes = [CollectionHandle]
+    lib.mneme_collection_free.restype = None
 
-LIB.mneme_collection_delete.argtypes = [CollectionHandle, ctypes.c_char_p]
-LIB.mneme_collection_delete.restype = ctypes.c_uint32
+    lib.mneme_collection_insert.argtypes = [
+        CollectionHandle,
+        ctypes.c_char_p,
+        ctypes.POINTER(ctypes.c_float),
+        ctypes.c_uint32,
+        ctypes.c_char_p,
+    ]
+    lib.mneme_collection_insert.restype = ctypes.c_uint32
 
-LIB.mneme_collection_count.argtypes = [CollectionHandle]
-LIB.mneme_collection_count.restype = ctypes.c_uint64
+    lib.mneme_collection_delete.argtypes = [CollectionHandle, ctypes.c_char_p]
+    lib.mneme_collection_delete.restype = ctypes.c_uint32
 
-LIB.mneme_collection_search_flat.argtypes = [
-    CollectionHandle,
-    ctypes.POINTER(ctypes.c_float),
-    ctypes.c_uint32,
-    ctypes.c_uint32,
-    ctypes.POINTER(ResultsHandle),
-]
-LIB.mneme_collection_search_flat.restype = ctypes.c_uint32
+    lib.mneme_collection_count.argtypes = [CollectionHandle]
+    lib.mneme_collection_count.restype = ctypes.c_uint64
 
-LIB.mneme_collection_build_hnsw.argtypes = [CollectionHandle, ctypes.POINTER(MnemeHnswConfig)]
-LIB.mneme_collection_build_hnsw.restype = ctypes.c_uint32
+    lib.mneme_collection_search_flat.argtypes = [
+        CollectionHandle,
+        ctypes.POINTER(ctypes.c_float),
+        ctypes.c_uint32,
+        ctypes.c_uint32,
+        ctypes.POINTER(ResultsHandle),
+    ]
+    lib.mneme_collection_search_flat.restype = ctypes.c_uint32
 
-LIB.mneme_collection_search_hnsw.argtypes = [
-    CollectionHandle,
-    ctypes.POINTER(ctypes.c_float),
-    ctypes.c_uint32,
-    ctypes.c_uint32,
-    ctypes.c_uint32,
-    ctypes.POINTER(ResultsHandle),
-]
-LIB.mneme_collection_search_hnsw.restype = ctypes.c_uint32
+    lib.mneme_collection_build_hnsw.argtypes = [CollectionHandle, ctypes.POINTER(MnemeHnswConfig)]
+    lib.mneme_collection_build_hnsw.restype = ctypes.c_uint32
 
-LIB.mneme_collection_save.argtypes = [CollectionHandle, ctypes.c_char_p]
-LIB.mneme_collection_save.restype = ctypes.c_uint32
+    lib.mneme_collection_search_hnsw.argtypes = [
+        CollectionHandle,
+        ctypes.POINTER(ctypes.c_float),
+        ctypes.c_uint32,
+        ctypes.c_uint32,
+        ctypes.c_uint32,
+        ctypes.POINTER(ResultsHandle),
+    ]
+    lib.mneme_collection_search_hnsw.restype = ctypes.c_uint32
 
-LIB.mneme_collection_load.argtypes = [ctypes.c_char_p, ctypes.POINTER(CollectionHandle)]
-LIB.mneme_collection_load.restype = ctypes.c_uint32
+    lib.mneme_collection_save.argtypes = [CollectionHandle, ctypes.c_char_p]
+    lib.mneme_collection_save.restype = ctypes.c_uint32
 
-LIB.mneme_results_len.argtypes = [ResultsHandle]
-LIB.mneme_results_len.restype = ctypes.c_uint32
+    lib.mneme_collection_load.argtypes = [ctypes.c_char_p, ctypes.POINTER(CollectionHandle)]
+    lib.mneme_collection_load.restype = ctypes.c_uint32
 
-LIB.mneme_results_id.argtypes = [ResultsHandle, ctypes.c_uint32]
-LIB.mneme_results_id.restype = ctypes.c_char_p
+    lib.mneme_results_len.argtypes = [ResultsHandle]
+    lib.mneme_results_len.restype = ctypes.c_uint32
 
-LIB.mneme_results_score.argtypes = [ResultsHandle, ctypes.c_uint32]
-LIB.mneme_results_score.restype = ctypes.c_float
+    lib.mneme_results_id.argtypes = [ResultsHandle, ctypes.c_uint32]
+    lib.mneme_results_id.restype = ctypes.c_char_p
 
-LIB.mneme_results_free.argtypes = [ResultsHandle]
-LIB.mneme_results_free.restype = None
+    lib.mneme_results_score.argtypes = [ResultsHandle, ctypes.c_uint32]
+    lib.mneme_results_score.restype = ctypes.c_float
+
+    lib.mneme_results_free.argtypes = [ResultsHandle]
+    lib.mneme_results_free.restype = None
+
+
+def get_lib() -> ctypes.CDLL:
+    global _LIB_INSTANCE
+    if _LIB_INSTANCE is None:
+        lib = _load_library()
+        _bind_function_signatures(lib)
+        _LIB_INSTANCE = lib
+    return _LIB_INSTANCE
+
+
+def __getattr__(name: str) -> Any:
+    if name == "LIB":
+        return get_lib()
+    raise AttributeError(name)
 
 
 def last_error_text() -> str:
-    value = LIB.mneme_last_error()
+    value = get_lib().mneme_last_error()
     return value.decode("utf-8") if value else "unknown mneme error"
 
 
@@ -337,15 +359,3 @@ def raise_for_status(status: int) -> None:
     if status == MNEME_ERROR_OUT_OF_MEMORY:
         raise MemoryError(message)
     raise MnemeError(message)
-
-
-def ensure_count(collection: CollectionHandle) -> int:
-    value = int(LIB.mneme_collection_count(collection))
-    # count() returns zero on both empty and failure, so check last_error when zero.
-    if value == 0:
-        err = last_error_text()
-        if err:
-            lowered = err.lower()
-            if "invalid" in lowered or "null" in lowered:
-                raise MnemeError(err)
-    return value

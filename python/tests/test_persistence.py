@@ -11,6 +11,8 @@ def test_save_load_roundtrip(tmp_path, mneme_module):
 
     loaded = mneme_module.Collection.load(path)
     try:
+        assert loaded.dimension is None
+        assert loaded.metric is None
         assert loaded.count() == 2
         results = loaded.search([1.0, 0.0, 0.0], k=2)
         assert results[0].id == "a"

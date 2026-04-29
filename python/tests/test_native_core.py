@@ -72,6 +72,22 @@ def test_safe_extract_tar_extracts_valid_member(tmp_path, native_module):
     assert (out / "lib" / "libmneme.dylib").exists()
 
 
+def test_safe_extract_tar_rejects_symlink_entry(tmp_path, native_module):
+    tar_path = tmp_path / "bad-link.tar.gz"
+    with tarfile.open(tar_path, "w:gz") as tf:
+        info = tarfile.TarInfo("lib/link")
+        info.type = tarfile.SYMTYPE
+        info.linkname = "/tmp/outside"
+        info.size = 0
+        tf.addfile(info)
+
+    with (
+        tarfile.open(tar_path, "r:gz") as tf,
+        pytest.raises(OSError, match="Refusing to extract link entry"),
+    ):
+        native_module._safe_extract_tar(tf, tmp_path / "out")
+
+
 def test_cache_dir_env_override(monkeypatch, tmp_path, native_module):
     monkeypatch.setenv("MNEME_CACHE_DIR", str(tmp_path))
     assert native_module._cache_dir() == tmp_path
@@ -157,24 +173,6 @@ def test_raise_for_status_mappings(monkeypatch, native_module):
         native_module.raise_for_status(native_module.MNEME_ERROR_INTERNAL)
 
 
-def test_ensure_count_zero_invalid_raises(monkeypatch, native_module):
-    class _Lib:
-        @staticmethod
-        def mneme_collection_count(_collection):
-            return 0
-
-    monkeypatch.setattr(native_module, "LIB", _Lib())
-    monkeypatch.setattr(native_module, "last_error_text", lambda: "invalid handle")
-    with pytest.raises(native_module.MnemeError):
-        native_module.ensure_count(None)
-
-
-def test_ensure_count_zero_non_error_returns_zero(monkeypatch, native_module):
-    class _Lib:
-        @staticmethod
-        def mneme_collection_count(_collection):
-            return 0
-
-    monkeypatch.setattr(native_module, "LIB", _Lib())
-    monkeypatch.setattr(native_module, "last_error_text", lambda: "")
-    assert native_module.ensure_count(None) == 0
+def test_module_getattr_unknown_attribute_raises(native_module):
+    with pytest.raises(AttributeError):
+        native_module.__getattr__("DOES_NOT_EXIST")

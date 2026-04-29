@@ -28,6 +28,8 @@ def _as_float_vector(values: Sequence[float]) -> tuple[ctypes.Array[ctypes.c_flo
 
 
 def _decode_results(handle: native.ResultsHandle) -> list[SearchResult]:
+    # mneme_results_id returns borrowed pointers that remain valid only until
+    # mneme_results_free is called for this handle; decode eagerly into Python strs.
     count = int(native.LIB.mneme_results_len(handle))
     out: list[SearchResult] = []
     for idx in range(count):
@@ -39,6 +41,9 @@ def _decode_results(handle: native.ResultsHandle) -> list[SearchResult]:
 
 
 class Collection:
+    dimension: int | None
+    metric: int | None
+
     def __init__(self, name: str, dimension: int, metric: int = native.MNEME_METRIC_COSINE) -> None:
         if not name:
             raise ValueError("name must be non-empty")
@@ -64,8 +69,10 @@ class Collection:
         obj = cls.__new__(cls)
         obj._handle = handle
         obj.name = Path(path).stem
-        obj.dimension = 0
-        obj.metric = native.MNEME_METRIC_COSINE
+        # ABI currently does not expose dimension/metric accessors after load.
+        # Keep these unknown instead of fabricating potentially wrong values.
+        obj.dimension = None
+        obj.metric = None
         return obj
 
     def close(self) -> None:
