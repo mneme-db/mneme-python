@@ -6,8 +6,6 @@ from pathlib import Path
 
 import pytest
 
-from mneme.errors import DimensionMismatchError, IndexNotBuiltError, IndexStaleError, MnemeError
-
 
 def test_validated_url_accepts_known_host(native_module):
     url = "https://api.github.com/repos/mneme-db/mneme/releases/latest"
@@ -145,17 +143,17 @@ def test_raise_for_status_mappings(monkeypatch, native_module):
     monkeypatch.setattr(native_module, "last_error_text", lambda: "boom")
     with pytest.raises(ValueError):
         native_module.raise_for_status(native_module.MNEME_ERROR_INVALID_ARGUMENT)
-    with pytest.raises(DimensionMismatchError):
+    with pytest.raises(native_module.DimensionMismatchError):
         native_module.raise_for_status(native_module.MNEME_ERROR_DIMENSION_MISMATCH)
     with pytest.raises(OSError):
         native_module.raise_for_status(native_module.MNEME_ERROR_IO)
-    with pytest.raises(IndexNotBuiltError):
+    with pytest.raises(native_module.IndexNotBuiltError):
         native_module.raise_for_status(native_module.MNEME_ERROR_INDEX_NOT_BUILT)
-    with pytest.raises(IndexStaleError):
+    with pytest.raises(native_module.IndexStaleError):
         native_module.raise_for_status(native_module.MNEME_ERROR_INDEX_STALE)
     with pytest.raises(MemoryError):
         native_module.raise_for_status(native_module.MNEME_ERROR_OUT_OF_MEMORY)
-    with pytest.raises(MnemeError):
+    with pytest.raises(native_module.MnemeError):
         native_module.raise_for_status(native_module.MNEME_ERROR_INTERNAL)
 
 
@@ -167,7 +165,7 @@ def test_ensure_count_zero_invalid_raises(monkeypatch, native_module):
 
     monkeypatch.setattr(native_module, "LIB", _Lib())
     monkeypatch.setattr(native_module, "last_error_text", lambda: "invalid handle")
-    with pytest.raises(MnemeError):
+    with pytest.raises(native_module.MnemeError):
         native_module.ensure_count(None)
 
 

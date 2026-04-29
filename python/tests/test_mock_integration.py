@@ -62,7 +62,8 @@ def _mock_collection(collection_cls):
     return col
 
 
-def test_collection_methods_with_mocked_native(monkeypatch):
+def test_collection_methods_with_mocked_native(monkeypatch, native_module):
+    _ = native_module
     collection_module = importlib.import_module("mneme.collection")
     collection_cls = collection_module.Collection
     search_result_cls = importlib.import_module("mneme.results").SearchResult
