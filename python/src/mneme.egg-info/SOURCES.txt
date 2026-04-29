@@ -14,6 +14,7 @@ src/mneme.egg-info/top_level.txt
 tests/test_collection.py
 tests/test_hnsw.py
 tests/test_mock_integration.py
+tests/test_native_core.py
 tests/test_native_release_mock.py
 tests/test_persistence.py
 tests/test_search.py
