@@ -91,6 +91,7 @@ def test_safe_extract_tar_rejects_symlink_entry(tmp_path, native_module):
 def test_cache_dir_env_override(monkeypatch, tmp_path, native_module):
     monkeypatch.setenv("MNEME_CACHE_DIR", str(tmp_path))
     assert native_module._cache_dir() == tmp_path
+    monkeypatch.delenv("MNEME_CACHE_DIR", raising=False)
 
 
 def test_env_bool_parsing(monkeypatch, native_module):
@@ -100,6 +101,7 @@ def test_env_bool_parsing(monkeypatch, native_module):
     assert native_module._env_bool("MNEME_FLAG", True) is False
     monkeypatch.setenv("MNEME_FLAG", "weird")
     assert native_module._env_bool("MNEME_FLAG", True) is True
+    monkeypatch.delenv("MNEME_FLAG", raising=False)
 
 
 def test_candidate_library_paths_include_repo_env(monkeypatch, native_module):
@@ -107,11 +109,13 @@ def test_candidate_library_paths_include_repo_env(monkeypatch, native_module):
     monkeypatch.setattr(native_module, "_library_filenames", lambda: ["libmneme.dylib"])
     paths = native_module._candidate_library_paths()
     assert Path("/tmp/mneme-custom/zig-out/lib/libmneme.dylib") in paths
+    monkeypatch.delenv("MNEME_REPO_PATH", raising=False)
 
 
 def test_download_release_library_disabled(monkeypatch, native_module):
     monkeypatch.setenv("MNEME_AUTO_DOWNLOAD", "0")
     assert native_module._download_release_library() is None
+    monkeypatch.delenv("MNEME_AUTO_DOWNLOAD", raising=False)
 
 
 def test_download_release_library_uses_cached_requested_dir(monkeypatch, tmp_path, native_module):
@@ -128,6 +132,8 @@ def test_download_release_library_uses_cached_requested_dir(monkeypatch, tmp_pat
     monkeypatch.setattr(native_module, "_library_filenames", lambda: [lib_name])
 
     assert native_module._download_release_library() == lib_path
+    monkeypatch.delenv("MNEME_AUTO_DOWNLOAD", raising=False)
+    monkeypatch.delenv("MNEME_RELEASE_TAG", raising=False)
 
 
 def test_download_release_library_finds_nested_extracted_lib(monkeypatch, tmp_path, native_module):
@@ -169,6 +175,8 @@ def test_download_release_library_finds_nested_extracted_lib(monkeypatch, tmp_pa
 
     found = native_module._download_release_library()
     assert found == nested_lib
+    monkeypatch.delenv("MNEME_AUTO_DOWNLOAD", raising=False)
+    monkeypatch.delenv("MNEME_RELEASE_TAG", raising=False)
 
 
 def test_raise_for_status_mappings(monkeypatch, native_module):
@@ -192,3 +200,16 @@ def test_raise_for_status_mappings(monkeypatch, native_module):
 def test_module_getattr_unknown_attribute_raises(native_module):
     with pytest.raises(AttributeError):
         native_module.__getattr__("DOES_NOT_EXIST")
+
+
+def test_load_library_rate_limit_error_surface(monkeypatch, native_module):
+    monkeypatch.setattr(native_module, "_LIB_INSTANCE", None)
+    monkeypatch.setattr(native_module, "_candidate_library_paths", lambda: [])
+    monkeypatch.setattr(native_module, "_library_filenames", lambda: [])
+    monkeypatch.setattr(
+        native_module,
+        "_download_release_library",
+        lambda: (_ for _ in ()).throw(OSError("HTTP Error 403: rate limit exceeded")),
+    )
+    with pytest.raises(OSError, match="rate limit exceeded"):
+        native_module._load_library()

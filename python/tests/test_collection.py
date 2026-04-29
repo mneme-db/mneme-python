@@ -39,6 +39,19 @@ def test_context_manager_closes_collection(mneme_module):
     assert collection._handle.value is None
 
 
+def test_use_after_close_raises(mneme_module):
+    collection = mneme_module.Collection("docs", dimension=3)
+    collection.close()
+    with pytest.raises(ValueError):
+        collection.insert("a", [1.0, 0.0, 0.0])
+
+
+def test_double_close_is_safe(mneme_module):
+    collection = mneme_module.Collection("docs", dimension=3)
+    collection.close()
+    collection.close()
+
+
 def test_dimension_mismatch_raises(mneme_module):
     collection = mneme_module.Collection("docs", dimension=3)
     try:
